@@ -5,7 +5,6 @@ MLISS
 
 @author: mdcob
 """
-# -*- coding: utf-8 -*-
 import streamlit as st
 import pickle
 import pandas as pd
@@ -76,9 +75,6 @@ def float_input_live(label, key, min_val=None, max_val=None, placeholder=""):
         return v
     return np.nan
 
-def yes_no_radio(label, key_prefix, key):
-    return st.radio(label, ['No', 'Yes'], index=0, horizontal=True, key=f"{key_prefix}_{key}")
-
 # ---------- Labels / bounds ----------
 label_map = {
     'TRAUMATYPE': "Trauma Type",
@@ -93,9 +89,9 @@ label_map = {
 bounds = {
     'AGEYEARS': (0, 150),
     'TOTALGCS': (3, 15),
-    'SBP': (0, 350),
+    'SBP': (0, 300),
     'TEMPERATURE': (0, 100),     # °C
-    'PULSERATE': (0, 300),
+    'PULSERATE': (0, 350),
     'WEIGHT': (2, 500),
 }
 
@@ -159,10 +155,27 @@ injury_categories_display = {
     ]
 }
 
-# ---------- Form: prevents reruns until submit ----------
+# ---------- Injury Pattern (OUTSIDE the form so it updates instantly) ----------
+st.subheader("Injury Pattern")
+injury_inputs = {}
+for region_label, subqs in injury_categories_display.items():
+    has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
+                          key=f"region_{region_label}")
+    if has_injury == 'Yes':
+        with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
+            for disp in subqs:
+                backend_var = frontend_labels[disp]
+                picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
+                                  key=f"inj_{backend_var}")
+                injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+    else:
+        for disp in subqs:
+            backend_var = frontend_labels[disp]
+            injury_inputs[backend_var] = 0
+
+# ---------- Patient Info & Vitals + Predict BUTTON (INSIDE a form) ----------
 with st.form("rtmliss_form", clear_on_submit=False):
     user_inputs = {}
-    injury_inputs = {}
     sbp_val = np.nan
     pulse_val = np.nan
 
@@ -170,13 +183,10 @@ with st.form("rtmliss_form", clear_on_submit=False):
 
     with col1:
         st.subheader("Patient Info & Vitals")
-
-        # Trauma type
         trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
                                index=0, horizontal=True, key='TRAUMATYPE')
         user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
 
-        # Numeric inputs (live helpers; namespaced raw keys)
         for var in ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']:
             lo, hi = bounds[var]
             if var == 'TEMPERATURE':
@@ -187,7 +197,7 @@ with st.form("rtmliss_form", clear_on_submit=False):
             if var == 'SBP': sbp_val = val
             if var == 'PULSERATE': pulse_val = val
 
-        # Derived ShockIndex (NaN-safe)
+        # ShockIndex
         if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
             and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
             user_inputs['ShockIndex'] = pulse_val / sbp_val
@@ -197,24 +207,11 @@ with st.form("rtmliss_form", clear_on_submit=False):
             user_inputs['ShockIndex'] = np.nan
 
     with col2:
-        st.subheader("Injury Pattern")
-        for region_label, subqs in injury_categories_display.items():
-            has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
-                                  key=f"region_{region_label}")
-            if has_injury == 'Yes':
-                with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
-                    for disp in subqs:
-                        backend_var = frontend_labels[disp]
-                        picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
-                                          key=f"inj_{backend_var}")
-                        injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
-            else:
-                for disp in subqs:
-                    backend_var = frontend_labels[disp]
-                    injury_inputs[backend_var] = 0
+        st.subheader("Summary")
+        user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
+        st.write(f"Number of injuries selected: **{user_inputs['NumberOfInjuries']}**")
 
-    # Count and merge injuries inside the form
-    user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
+    # Merge injury inputs inside the form (so X is complete at submit time)
     user_inputs.update(injury_inputs)
 
     # Build X in model's expected order (NaNs allowed)
@@ -224,10 +221,9 @@ with st.form("rtmliss_form", clear_on_submit=False):
     except Exception as e:
         st.error(f"Column alignment error: {e}")
 
-    # Submit button INSIDE the form
     submitted = st.form_submit_button("Predict Mortality")
 
-# ---------- Output (persists prediction across reruns) ----------
+# ---------- Output (persist last prediction) ----------
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
 mortality_output = st.empty()
 
@@ -259,3 +255,4 @@ if st.button("Reset Form"):
     for k in list(set(keys_to_clear)):
         del st.session_state[k]
     st.rerun()
+
