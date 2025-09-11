@@ -73,7 +73,7 @@ st.markdown(
 
     
 # === Helper Functions ===
-def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
+def int_input(label, key, min_val=None, max_val=None, placeholder=""):
     """
     A text_input that behaves like a number input but updates on every keystroke.
     Returns np.nan when blank or invalid; otherwise an int within optional bounds.
@@ -272,6 +272,7 @@ if st.button("Reset Form"):
         del st.session_state[key]
 
     st.rerun()
+
 
 
 
