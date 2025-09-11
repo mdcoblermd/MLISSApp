@@ -73,31 +73,13 @@ st.markdown(
 
     
 # === Helper Functions ===
-def int_input(label, key, min_val=None, max_val=None, placeholder=""):
-    """
-    A text_input that behaves like a number input but updates on every keystroke.
-    Returns np.nan when blank or invalid; otherwise an int within optional bounds.
-    """
-    raw_key = f"{key}__raw"
-    raw = st.text_input(label, value=st.session_state.get(raw_key, ""),
-                        key=raw_key, placeholder=placeholder)
-    raw = raw.strip()
+def int_input(label, key):
+    raw = st.text_input(label, value="", key=key, help="Enter a whole number or leave blank")
+    try:
+        return int(raw)
+    except ValueError:
+        return np.nan
 
-    if raw == "":
-        val = np.nan
-    elif re.fullmatch(r"\d+", raw):  # digits only; tweak regex if you need negatives/decimals
-        v = int(raw)
-        if (min_val is not None and v < min_val) or (max_val is not None and v > max_val):
-            val = np.nan
-        else:
-            val = v
-    else:
-        val = np.nan
-
-    # keep the parsed value in session_state too (optional)
-    st.session_state[key] = val
-    return val
-    
 def yes_no_radio(label, key):
     return st.radio(label, ['No', 'Yes'], index=0, horizontal=True, key=key)
 
@@ -272,6 +254,7 @@ if st.button("Reset Form"):
         del st.session_state[key]
 
     st.rerun()
+
 
 
 
