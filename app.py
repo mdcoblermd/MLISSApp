@@ -217,15 +217,15 @@ input_df = pd.DataFrame([user_inputs])
 
 
 
-# === Check for missing inputs ===
-if any(pd.isna(val) for val in user_inputs.values()):
-    st.markdown(
-        "<span style='color:red; font-weight:bold;'>"
-        "⚠️ One or more of the input variables are missing. "
-        "A score will still be calculated but it may be inaccurate."
-        "</span>",
-        unsafe_allow_html=True
-    )
+# # === Check for missing inputs ===
+# if any(pd.isna(val) for val in user_inputs.values()):
+#     st.markdown(
+#         "<span style='color:red; font-weight:bold;'>"
+#         "⚠️ One or more of the input variables are missing. "
+#         "A score will still be calculated but it may be inaccurate."
+#         "</span>",
+#         unsafe_allow_html=True
+#     )
     
 # Always show the heading
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
@@ -254,6 +254,7 @@ if st.button("Reset Form"):
         del st.session_state[key]
 
     st.rerun()
+
 
 
 
