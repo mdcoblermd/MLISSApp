@@ -5,6 +5,7 @@ MLISS
 
 @author: mdcob
 """
+# -*- coding: utf-8 -*-
 import streamlit as st
 import pickle
 import pandas as pd
@@ -92,10 +93,10 @@ label_map = {
 bounds = {
     'AGEYEARS': (0, 150),
     'TOTALGCS': (3, 15),
-    'SBP': (0, 300),
-    'TEMPERATURE': (0, 100),     # °C; adjust if needed
-    'PULSERATE': (0, 3000),
-    'WEIGHT': (1, 500),
+    'SBP': (0, 350),
+    'TEMPERATURE': (0, 100),     # °C
+    'PULSERATE': (0, 300),
+    'WEIGHT': (2, 500),
 }
 
 frontend_labels = {
@@ -158,79 +159,82 @@ injury_categories_display = {
     ]
 }
 
-# ---------- Inputs ----------
-user_inputs = {}
-injury_inputs = {}
-sbp_val = np.nan
-pulse_val = np.nan
+# ---------- Form: prevents reruns until submit ----------
+with st.form("rtmliss_form", clear_on_submit=False):
+    user_inputs = {}
+    injury_inputs = {}
+    sbp_val = np.nan
+    pulse_val = np.nan
 
-col1, _, col2 = st.columns([2, 1, 2])
+    col1, _, col2 = st.columns([2, 1, 2])
 
-with col1:
-    st.subheader("Patient Info & Vitals")
+    with col1:
+        st.subheader("Patient Info & Vitals")
 
-    # Trauma type (unique key; not namespaced)
-    trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
-                           index=0, horizontal=True, key='TRAUMATYPE')
-    user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
+        # Trauma type
+        trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
+                               index=0, horizontal=True, key='TRAUMATYPE')
+        user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
 
-    # Numeric inputs (namespaced keys for raw buffers)
-    for var in ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']:
-        lo, hi = bounds[var]
-        if var == 'TEMPERATURE':
-            val = float_input_live(label_map[var], var, min_val=lo, max_val=hi)
+        # Numeric inputs (live helpers; namespaced raw keys)
+        for var in ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']:
+            lo, hi = bounds[var]
+            if var == 'TEMPERATURE':
+                val = float_input_live(label_map[var], var, min_val=lo, max_val=hi)
+            else:
+                val = int_input_live(label_map[var], var, min_val=lo, max_val=hi)
+            user_inputs[var] = val
+            if var == 'SBP': sbp_val = val
+            if var == 'PULSERATE': pulse_val = val
+
+        # Derived ShockIndex (NaN-safe)
+        if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
+            and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
+            user_inputs['ShockIndex'] = pulse_val / sbp_val
+        elif sbp_val == 0 or pulse_val == 0:
+            user_inputs['ShockIndex'] = 2.0
         else:
-            val = int_input_live(label_map[var], var, min_val=lo, max_val=hi)
-        user_inputs[var] = val
-        if var == 'SBP': sbp_val = val
-        if var == 'PULSERATE': pulse_val = val
+            user_inputs['ShockIndex'] = np.nan
 
-    # Derived ShockIndex (NaN-safe)
-    if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
-        and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
-        user_inputs['ShockIndex'] = pulse_val / sbp_val
-    elif sbp_val == 0 or pulse_val == 0:
-        user_inputs['ShockIndex'] = 2.0
-    else:
-        user_inputs['ShockIndex'] = np.nan
-
-with col2:
-    st.subheader("Injury Pattern")
-    for region_label, subqs in injury_categories_display.items():
-        # Namespaced key for region-level radio
-        has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
-                              key=f"region_{region_label}")
-        if has_injury == 'Yes':
-            with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
+    with col2:
+        st.subheader("Injury Pattern")
+        for region_label, subqs in injury_categories_display.items():
+            has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
+                                  key=f"region_{region_label}")
+            if has_injury == 'Yes':
+                with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
+                    for disp in subqs:
+                        backend_var = frontend_labels[disp]
+                        picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
+                                          key=f"inj_{backend_var}")
+                        injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+            else:
                 for disp in subqs:
                     backend_var = frontend_labels[disp]
-                    picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
-                                      key=f"inj_{backend_var}")
-                    injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
-        else:
-            for disp in subqs:
-                backend_var = frontend_labels[disp]
-                injury_inputs[backend_var] = 0
+                    injury_inputs[backend_var] = 0
 
-# Count and merge injuries
-user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
-user_inputs.update(injury_inputs)
+    # Count and merge injuries inside the form
+    user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
+    user_inputs.update(injury_inputs)
 
-# ---------- Prediction (button; persists last result; allows NaNs) ----------
+    # Build X in model's expected order (NaNs allowed)
+    X = None
+    try:
+        X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
+    except Exception as e:
+        st.error(f"Column alignment error: {e}")
+
+    # Submit button INSIDE the form
+    submitted = st.form_submit_button("Predict Mortality")
+
+# ---------- Output (persists prediction across reruns) ----------
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
 mortality_output = st.empty()
 
 if 'last_pred' not in st.session_state:
     st.session_state['last_pred'] = None
 
-# Build X in model's expected order; NaNs are allowed by your pipeline
-X = None
-try:
-    X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
-except Exception as e:
-    mortality_output.error(f"Column alignment error: {e}")
-
-if st.button("Predict Mortality") and X is not None:
+if submitted and X is not None:
     try:
         X_scaled = scaler.transform(X)
         pred = float(model.predict_proba(X_scaled)[:, 1][0])
@@ -255,24 +259,3 @@ if st.button("Reset Form"):
     for k in list(set(keys_to_clear)):
         del st.session_state[k]
     st.rerun()
-
-# ---------- (Optional) Debug ----------
-# with st.expander("Debug session_state"):
-#     st.json({k: st.session_state[k] for k in sorted(st.session_state.keys())})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
