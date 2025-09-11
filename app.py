@@ -73,12 +73,30 @@ st.markdown(
 
     
 # === Helper Functions ===
-def int_input(label, key):
-    raw = st.text_input(label, value="", key=key, help="Enter a whole number or leave blank")
-    try:
-        return int(raw)
-    except ValueError:
-        return np.nan
+def float_input_live(label, key, min_val=None, max_val=None, placeholder=""):
+    """
+    Text input that validates floats on every keystroke.
+    Returns np.nan when blank/invalid; else a float within optional bounds.
+    """
+    raw_key = f"{key}__raw"
+    if raw_key not in st.session_state:
+        st.session_state[raw_key] = ""
+
+    raw = st.text_input(label, key=raw_key, placeholder=placeholder).strip()
+
+    if raw == "":
+        val = np.nan
+    elif re.fullmatch(r"\d+(\.\d+)?", raw):   # digits with optional .decimal
+        v = float(raw)
+        if (min_val is not None and v < min_val) or (max_val is not None and v > max_val):
+            val = np.nan
+        else:
+            val = v
+    else:
+        val = np.nan
+
+    st.session_state[key] = val
+    return val
 
 def yes_no_radio(label, key):
     return st.radio(label, ['No', 'Yes'], index=0, horizontal=True, key=key)
@@ -169,20 +187,31 @@ injury_inputs = {}
 
 # === Two-Column Layout ===
 col1, spacer, col2 = st.columns([2, 1, 2])
+bounds = {
+    'AGEYEARS': (0, 110),
+    'TOTALGCS': (3, 15),
+    'SBP': (40, 260),
+    'TEMPERATURE': (30, 43),   # realistic °C range
+    'PULSERATE': (20, 220),
+    'WEIGHT': (2, 400),
+}
 
 with col1:
     st.subheader("Patient Info & Vitals")
     for var, label in label_map.items():
         if var == 'TRAUMATYPE':
-            trauma_type = st.radio(label, ['Blunt', 'Penetrating'], index=0, horizontal=True, key='TRAUMATYPE')
+            trauma_type = st.radio(label, ['Blunt', 'Penetrating'],
+                                   index=0, horizontal=True, key='TRAUMATYPE')
             user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
         else:
-            val = int_input(label, var)
+            lo, hi = bounds.get(var, (None, None))
+            if var == 'TEMPERATURE':
+                val = float_input_live(label, var, min_val=lo, max_val=hi)
+            else:
+                val = int_input_live(label, var, min_val=lo, max_val=hi)
             user_inputs[var] = val
-            if var == 'SBP':
-                sbp_val = val
-            elif var == 'PULSERATE':
-                pulse_val = val
+            if var == 'SBP': sbp_val = val
+            if var == 'PULSERATE': pulse_val = val
 
     # === Derive ShockIndex ===
     if sbp_val == 0 or pulse_val == 0:
@@ -254,6 +283,7 @@ if st.button("Predict Mortality"):
 #         del st.session_state[key]
 
 #     st.rerun()
+
 
 
 
