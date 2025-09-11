@@ -45,11 +45,16 @@ st.markdown("""
 
 
 # === Load Model and Scaler ===
-with open('calibrated_model2.pkl', 'rb') as file:
-    model = pickle.load(file)
+@st.cache_resource
+def load_artifacts():
+    import pickle
+    with open("calibrated_model2.pkl","rb") as f:
+        model = pickle.load(f)
+    with open("scaler2.pkl","rb") as f:
+        scaler = pickle.load(f)
+    return model, scaler
 
-with open('scaler2.pkl', 'rb') as file:
-    scaler = pickle.load(file)
+model, scaler = load_artifacts()
 
 st.title("RT-MLISS Score")
 
@@ -303,6 +308,7 @@ if st.button("Predict Mortality"):
 #         del st.session_state[key]
 
 #     st.rerun()
+
 
 
 
