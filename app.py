@@ -73,6 +73,26 @@ st.markdown(
 
     
 # === Helper Functions ===
+def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
+    raw_key = f"{key}__raw"           # separate raw string storage
+
+    # initialize once; DO NOT pass `value=` into st.text_input on every rerun
+    if raw_key not in st.session_state:
+        st.session_state[raw_key] = ""
+
+    raw = st.text_input(label, key=raw_key, placeholder=placeholder).strip()
+
+    if raw == "":
+        val = np.nan
+    elif re.fullmatch(r"\d+", raw):
+        v = int(raw)
+        val = np.nan if (min_val is not None and v < min_val) or (max_val is not None and v > max_val) else v
+    else:
+        val = np.nan
+
+    st.session_state[key] = val       # parsed integer your app uses
+    return val
+    
 def float_input_live(label, key, min_val=None, max_val=None, placeholder=""):
     """
     Text input that validates floats on every keystroke.
@@ -283,6 +303,7 @@ if st.button("Predict Mortality"):
 #         del st.session_state[key]
 
 #     st.rerun()
+
 
 
 
