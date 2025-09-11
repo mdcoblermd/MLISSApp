@@ -43,7 +43,7 @@ JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, N Nam
 </p>
 """, unsafe_allow_html=True)
 
-# ---------------- Helpers (live inputs; no reset) ----------------
+# ---------------- Helpers (live inputs) ----------------
 def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
     raw_key = f"numraw_{key}"
     if raw_key not in st.session_state:
@@ -118,11 +118,11 @@ frontend_labels = {
     "Liver Injury": "LiverInjury",
     "Colorectal Injury": "ColorectalInjury",
     "Small Bowel Injury": "SmallBowelInjury",
-    "Upper Extremity Amputation (other than finger)": "UEAmputation",
+    "Upper Extremity Amputation": "UEAmputation",
     "Upper Extremity Vascular Injury": "UEVascularInjury",
     "Upper Extremity Long Bone Fracture": "UELongBoneFx",
     "Lower Extremity Vascular Injury": "LEVascularInjury",
-    "Lower Extremity Amputation (other than toe)": "LEAmputation",
+    "Lower Extremity Amputation": "LEAmputation",
     "Lower Extremity Long Bone Fracture": "LELongBoneFx"
 }
 injury_categories_display = {
@@ -144,69 +144,69 @@ injury_categories_display = {
         "Colorectal Injury", "Small Bowel Injury"
     ],
     "Extremity injury?": [
-        "Upper Extremity Amputation (other than finger)", "Upper Extremity Vascular Injury",
+        "Upper Extremity Amputation", "Upper Extremity Vascular Injury",
         "Upper Extremity Long Bone Fracture", "Lower Extremity Vascular Injury",
-        "Lower Extremity Amputation (other than toe)", "Lower Extremity Long Bone Fracture"
+        "Lower Extremity Amputation", "Lower Extremity Long Bone Fracture"
     ]
 }
 
 # ---------------- Layout: two columns ----------------
 col_vitals, _, col_injury = st.columns([2, 0.4, 2])
 
-# RIGHT column: Injury Pattern (boxed via expander; updates instantly)
-with col_injury:
-    with st.expander("Injury Pattern", expanded=True):   # <- boxed look
-        injury_inputs = {}
-        for region_label, subqs in injury_categories_display.items():
-            has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
-                                  key=f"region_{region_label}")
-            if has_injury == 'Yes':
-                with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
-                    for disp in subqs:
-                        backend_var = frontend_labels[disp]
-                        picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
-                                          key=f"inj_{backend_var}")
-                        injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
-            else:
-                for disp in subqs:
-                    backend_var = frontend_labels[disp]
-                    injury_inputs[backend_var] = 0
-
-# LEFT column: Vitals (boxed via expander), trauma type, derived features
+# Vitals (left)
 with col_vitals:
-    with st.expander("Patient Info & Vitals", expanded=True):  # <- boxed look
-        user_inputs = {}
-        sbp_val = np.nan
-        pulse_val = np.nan
+    st.subheader("Patient Info & Vitals")
+    user_inputs = {}
+    sbp_val = np.nan
+    pulse_val = np.nan
 
-        trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
-                               index=0, horizontal=True, key='TRAUMATYPE')
-        user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
+    trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
+                           index=0, horizontal=True, key='TRAUMATYPE')
+    user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
 
-        for var in ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']:
-            lo, hi = bounds[var]
-            if var == 'TEMPERATURE':
-                val = float_input_live(label_map[var], var, min_val=lo, max_val=hi)
-            else:
-                val = int_input_live(label_map[var], var, min_val=lo, max_val=hi)
-            user_inputs[var] = val
-            if var == 'SBP': sbp_val = val
-            if var == 'PULSERATE': pulse_val = val
-
-        # ShockIndex (NaN-safe)
-        if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
-            and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
-            user_inputs['ShockIndex'] = pulse_val / sbp_val
-        elif sbp_val == 0 or pulse_val == 0:
-            user_inputs['ShockIndex'] = 2.0
+    for var in ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']:
+        lo, hi = bounds[var]
+        if var == 'TEMPERATURE':
+            val = float_input_live(label_map[var], var, min_val=lo, max_val=hi)
         else:
-            user_inputs['ShockIndex'] = np.nan
+            val = int_input_live(label_map[var], var, min_val=lo, max_val=hi)
+        user_inputs[var] = val
+        if var == 'SBP': sbp_val = val
+        if var == 'PULSERATE': pulse_val = val
+
+    # ShockIndex
+    if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
+        and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
+        user_inputs['ShockIndex'] = pulse_val / sbp_val
+    elif sbp_val == 0 or pulse_val == 0:
+        user_inputs['ShockIndex'] = 2.0
+    else:
+        user_inputs['ShockIndex'] = np.nan
+
+# Injury Pattern (right)
+with col_injury:
+    st.subheader("Injury Pattern")
+    injury_inputs = {}
+    for region_label, subqs in injury_categories_display.items():
+        has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
+                              key=f"region_{region_label}")
+        if has_injury == 'Yes':
+            st.markdown(f"**Specify injuries for {region_label.replace(' injury?', '')}:**")
+            for disp in subqs:
+                backend_var = frontend_labels[disp]
+                picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
+                                  key=f"inj_{backend_var}")
+                injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+        else:
+            for disp in subqs:
+                backend_var = frontend_labels[disp]
+                injury_inputs[backend_var] = 0
 
 # Merge injuries
 user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
 user_inputs.update(injury_inputs)
 
-# ---------------- Predict button BELOW both columns ----------------
+# ---------------- Predict button BELOW both ----------------
 st.markdown("---")
 clicked = st.button("Predict Mortality")
 
@@ -216,7 +216,6 @@ mortality_output = st.empty()
 if 'last_pred' not in st.session_state:
     st.session_state['last_pred'] = None
 
-# Build X in the model's expected order (NaNs allowed)
 X = None
 try:
     X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
@@ -238,7 +237,7 @@ if st.session_state['last_pred'] is not None:
         unsafe_allow_html=True
     )
 
-# ---------------- Reset (only clears our own keys) ----------------
+# ---------------- Reset ----------------
 if st.button("Reset Form"):
     keys_to_clear = [k for k in st.session_state.keys()
                      if k.startswith("numraw_")
