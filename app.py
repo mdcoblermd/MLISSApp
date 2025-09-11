@@ -73,22 +73,12 @@ st.markdown(
 
     
 # === Helper Functions ===
-def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
-    raw_key = f"{key}__raw"
-    if raw_key not in st.session_state:
-        st.session_state[raw_key] = ""          # initialize once
-
-    raw = st.text_input(label, key=raw_key, placeholder=placeholder).strip()  # no `value=`
-    if raw == "":
-        val = np.nan
-    elif re.fullmatch(r"\d+", raw):
-        v = int(raw)
-        val = np.nan if (min_val is not None and v < min_val) or (max_val is not None and v > max_val) else v
-    else:
-        val = np.nan
-
-    st.session_state[key] = val                 # parsed value for your app logic
-    return val
+def int_input(label, key):
+    raw = st.text_input(label, value="", key=key, help="Enter a whole number or leave blank")
+    try:
+        return int(raw)
+    except ValueError:
+        return np.nan
 
 def yes_no_radio(label, key):
     return st.radio(label, ['No', 'Yes'], index=0, horizontal=True, key=key)
@@ -264,6 +254,7 @@ if st.button("Reset Form"):
         del st.session_state[key]
 
     st.rerun()
+
 
 
 
