@@ -72,12 +72,20 @@ st.markdown(
 
     
 # === Helper Functions ===
-def int_input(label, key):
+def int_input(label, key, min_val=None, max_val=None):
+    """Integer input that returns np.nan if user leaves it blank."""
+    # Use a small text_input "shim" to allow true blank, otherwise number_input forces a default.
     raw = st.text_input(label, value="", key=key, help="Enter a whole number or leave blank")
+    if raw == "":
+        return np.nan
     try:
-        return int(raw)
+        v = int(raw)
+        if (min_val is not None and v < min_val) or (max_val is not None and v > max_val):
+            return np.nan
+        return v
     except ValueError:
         return np.nan
+
 
 def yes_no_radio(label, key):
     return st.radio(label, ['No', 'Yes'], index=0, horizontal=True, key=key)
@@ -253,6 +261,7 @@ if st.button("Reset Form"):
         del st.session_state[key]
 
     st.rerun()
+
 
 
 
