@@ -25,12 +25,12 @@ st.markdown("""
 
     /* Make fonts more legible */
     html, body, [class*="css"]  {
-        font-size: 1.25rem;
+        font-size: 1.15rem;
     }
 
     /* Optional: make input boxes bigger */
     input, select, textarea {
-        font-size: 1.1rem !important;
+        font-size: 1.0rem !important;
     }
 
     /* Reduce vertical whitespace between form elements */
@@ -55,14 +55,14 @@ st.title("RT-MLISS Score")
 
 st.markdown(
     """
-    <h4 style='margin-top: -10px; color: gray;'>
+    <h4 style='margin-top: -8px; color: gray;'>
         A real-time mortality prediction tool for trauma patients
     </h4>
-    <p style='font-size:22px; color: #555; font-style: bold;'>
+    <p style='font-size:20px; color: #555; font-style: bold;'>
         Developed by MD Cobler-Lichter MD MSDS, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
         JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, N Namias MD MBA
     </p>
-    <p style='font-size:18x; color: #555; font-style: italic;'>
+    <p style='font-size:16x; color: #555; font-style: italic;'>
         Our models are calibrated such that the outputted scores reflects an accurate prediction
         of the true probability of in-hospital mortality based on our training data
     </p>,
@@ -252,4 +252,5 @@ if st.button("Reset Form"):
     for key in st.session_state.keys():
         del st.session_state[key]
     st.rerun()
+
 
