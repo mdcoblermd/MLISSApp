@@ -45,12 +45,16 @@ st.markdown("""
 
 
 # === Load Model and Scaler ===
-with open('calibrated_model2.pkl', 'rb') as file:
-    model = pickle.load(file)
+@st.cache_resource
+def load_artifacts():
+    import pickle
+    with open("calibrated_model2.pkl","rb") as f:
+        model = pickle.load(f)
+    with open("scaler2.pkl","rb") as f:
+        scaler = pickle.load(f)
+    return model, scaler
 
-with open('scaler2.pkl', 'rb') as file:
-    scaler = pickle.load(file)
-
+model, scaler = load_artifacts()
 
 st.title("RT-MLISS Score")
 
@@ -284,19 +288,63 @@ st.markdown("### RT-MLISS Score (Predicted Mortality):")
 mortality_output = st.empty()
 
 # Prediction button logic
-if st.button("Predict Mortality"):
-    try:
-        input_df = input_df[scaler.feature_names_in_]
-        input_scaled = scaler.transform(input_df)
-        prediction_proba = model.predict_proba(input_scaled)[:, 1][0]
+st.markdown("### RT-MLISS Score (Predicted Mortality):")
+mortality_output = st.empty()
 
-        # Output with large font size
-        mortality_output.markdown(
-            f"<p style='font-size:36px; font-weight:bold; color:#d62728;'>{prediction_proba:.1%}</p>",
-            unsafe_allow_html=True
-        )
+# Which fields must be present to enable Predict?
+required = ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']
+
+# Build the one-row frame in the model’s expected column order
+try:
+    X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
+except Exception as e:
+    mortality_output.error(f"Column alignment error: {e}")
+    X = None
+
+inputs_ready = X is not None and not X.isna().any(axis=1).item()
+
+# Session storage for last prediction and last inputs signature
+if 'last_pred' not in st.session_state:
+    st.session_state['last_pred'] = None
+if 'last_sig' not in st.session_state:
+    st.session_state['last_sig'] = None
+
+def make_signature(df_row: pd.DataFrame) -> tuple:
+    # Deterministic, NaN-safe signature of current inputs (in model column order)
+    s = df_row.iloc[0].astype(object)
+    return tuple(None if pd.isna(v) else float(v) for v in s)
+
+current_sig = make_signature(X) if X is not None else None
+changed_since_last = (current_sig is not None and 
+                      st.session_state['last_sig'] is not None and 
+                      current_sig != st.session_state['last_sig'])
+
+# Predict button
+clicked = st.button("Predict Mortality", disabled=not inputs_ready)
+
+if clicked and inputs_ready:
+    try:
+        X_scaled = scaler.transform(X)
+        pred = float(model.predict_proba(X_scaled)[:, 1][0])
+        st.session_state['last_pred'] = pred
+        st.session_state['last_sig']  = current_sig
     except Exception as e:
-        mortality_output.error(f"Error: {e}")
+        st.session_state['last_pred'] = None
+        mortality_output.error(f"Error during prediction: {e}")
+
+# Show result (persist across reruns)
+if st.session_state['last_pred'] is not None:
+    mortality_output.markdown(
+        f"<p style='font-size:36px; font-weight:bold; color:#d62728;'>{st.session_state['last_pred']:.1%}</p>",
+        unsafe_allow_html=True
+    )
+    if changed_since_last:
+        st.caption("Inputs changed since last prediction — press **Predict Mortality** to refresh.")
+else:
+    if not inputs_ready:
+        missing = [k for k in required if pd.isna(user_inputs.get(k))]
+        if missing:
+            st.info("Enter all required fields to enable **Predict Mortality**.")
 
 # # === Reset Button ===
 # if st.button("Reset Form"):
@@ -304,6 +352,7 @@ if st.button("Predict Mortality"):
 #         del st.session_state[key]
 
 #     st.rerun()
+
 
 
 
