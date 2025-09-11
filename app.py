@@ -9,7 +9,6 @@ import streamlit as st
 import pickle
 import pandas as pd
 import numpy as np
-import re
 
 st.set_page_config(layout="centered")
 
@@ -26,12 +25,12 @@ st.markdown("""
 
     /* Make fonts more legible */
     html, body, [class*="css"]  {
-        font-size: 1.0rem;
+        font-size: 1.15rem;
     }
 
     /* Optional: make input boxes bigger */
     input, select, textarea {
-        font-size: 0.9rem !important;
+        font-size: 1.0rem !important;
     }
 
     /* Reduce vertical whitespace between form elements */
@@ -45,83 +44,40 @@ st.markdown("""
 
 
 # === Load Model and Scaler ===
-@st.cache_resource
-def load_artifacts():
-    import pickle
-    with open("calibrated_model2.pkl","rb") as f:
-        model = pickle.load(f)
-    with open("scaler2.pkl","rb") as f:
-        scaler = pickle.load(f)
-    return model, scaler
+with open('calibrated_model2.pkl', 'rb') as file:
+    model = pickle.load(file)
 
-model, scaler = load_artifacts()
+with open('scaler2.pkl', 'rb') as file:
+    scaler = pickle.load(file)
 
 st.title("RT-MLISS Score")
 
 
 st.markdown(
     """
-    <h4 style='margin-top: -8px; color: gray;'>
+    <h4 style='margin-top: -10px; color: gray;'>
         A real-time mortality prediction tool for trauma patients
     </h4>
-    <p style='font-size:18px; color: #555; font-style: bold;'>
+    <p style='font-size:22px; color: #555; font-style: bold;'>
         Developed by <b>MD Cobler-Lichter MD MSDS</b>, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
         JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, N Namias MD MBA
     </p>
-    <p style='font-size:16x; color: #555; font-style: italic;'>
+    <p style='font-size:18x; color: #555; font-style: italic;'>
         Our models are calibrated such that the outputted scores reflects an accurate prediction
         of the true probability of in-hospital mortality based on our training data
-    </p>
+    </p>,
     """,
     unsafe_allow_html=True
 )
 
     
 # === Helper Functions ===
-def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
-    raw_key = f"{key}__raw"           # separate raw string storage
-
-    # initialize once; DO NOT pass `value=` into st.text_input on every rerun
-    if raw_key not in st.session_state:
-        st.session_state[raw_key] = ""
-
-    raw = st.text_input(label, key=raw_key, placeholder=placeholder).strip()
-
-    if raw == "":
-        val = np.nan
-    elif re.fullmatch(r"\d+", raw):
-        v = int(raw)
-        val = np.nan if (min_val is not None and v < min_val) or (max_val is not None and v > max_val) else v
-    else:
-        val = np.nan
-
-    st.session_state[key] = val       # parsed integer your app uses
-    return val
-    
-def float_input_live(label, key, min_val=None, max_val=None, placeholder=""):
-    """
-    Text input that validates floats on every keystroke.
-    Returns np.nan when blank/invalid; else a float within optional bounds.
-    """
-    raw_key = f"{key}__raw"
-    if raw_key not in st.session_state:
-        st.session_state[raw_key] = ""
-
-    raw = st.text_input(label, key=raw_key, placeholder=placeholder).strip()
-
-    if raw == "":
-        val = np.nan
-    elif re.fullmatch(r"\d+(\.\d+)?", raw):   # digits with optional .decimal
-        v = float(raw)
-        if (min_val is not None and v < min_val) or (max_val is not None and v > max_val):
-            val = np.nan
-        else:
-            val = v
-    else:
-        val = np.nan
-
-    st.session_state[key] = val
-    return val
+def int_input(label, key):
+    raw = st.text_input(label, value="", key=key, help="Enter a whole number or leave blank")
+    try:
+        return int(raw)
+    except ValueError:
+        return np.nan
 
 def yes_no_radio(label, key):
     return st.radio(label, ['No', 'Yes'], index=0, horizontal=True, key=key)
@@ -212,31 +168,20 @@ injury_inputs = {}
 
 # === Two-Column Layout ===
 col1, spacer, col2 = st.columns([2, 1, 2])
-bounds = {
-    'AGEYEARS': (0, 110),
-    'TOTALGCS': (3, 15),
-    'SBP': (40, 260),
-    'TEMPERATURE': (30, 43),   # realistic °C range
-    'PULSERATE': (20, 220),
-    'WEIGHT': (2, 400),
-}
 
 with col1:
     st.subheader("Patient Info & Vitals")
     for var, label in label_map.items():
         if var == 'TRAUMATYPE':
-            trauma_type = st.radio(label, ['Blunt', 'Penetrating'],
-                                   index=0, horizontal=True, key='TRAUMATYPE')
+            trauma_type = st.radio(label, ['Blunt', 'Penetrating'], index=0, horizontal=True, key='TRAUMATYPE')
             user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
         else:
-            lo, hi = bounds.get(var, (None, None))
-            if var == 'TEMPERATURE':
-                val = float_input_live(label, var, min_val=lo, max_val=hi)
-            else:
-                val = int_input_live(label, var, min_val=lo, max_val=hi)
+            val = int_input(label, var)
             user_inputs[var] = val
-            if var == 'SBP': sbp_val = val
-            if var == 'PULSERATE': pulse_val = val
+            if var == 'SBP':
+                sbp_val = val
+            elif var == 'PULSERATE':
+                pulse_val = val
 
     # === Derive ShockIndex ===
     if sbp_val == 0 or pulse_val == 0:
@@ -281,45 +226,33 @@ input_df = pd.DataFrame([user_inputs])
 #         unsafe_allow_html=True
 #     )
     
-
+# Always show the heading
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
+
+# Placeholder for the dynamic result
 mortality_output = st.empty()
 
-# Build DataFrame in model’s expected order (NaNs are fine)
-try:
-    X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
-except Exception as e:
-    mortality_output.error(f"Column alignment error: {e}")
-    X = None
-
-# Session storage for last prediction
-if 'last_pred' not in st.session_state:
-    st.session_state['last_pred'] = None
-
-# Predict button
-if st.button("Predict Mortality") and X is not None:
+# Prediction button logic
+if st.button("Predict Mortality"):
     try:
-        X_scaled = scaler.transform(X)
-        pred = float(model.predict_proba(X_scaled)[:, 1][0])
-        st.session_state['last_pred'] = pred
+        input_df = input_df[scaler.feature_names_in_]
+        input_scaled = scaler.transform(input_df)
+        prediction_proba = model.predict_proba(input_scaled)[:, 1][0]
+
+        # Output with large font size
+        mortality_output.markdown(
+            f"<p style='font-size:36px; font-weight:bold; color:#d62728;'>{prediction_proba:.1%}</p>",
+            unsafe_allow_html=True
+        )
     except Exception as e:
-        st.session_state['last_pred'] = None
-        mortality_output.error(f"Error during prediction: {e}")
+        mortality_output.error(f"Error: {e}")
 
-# Show result if we have one
-if st.session_state['last_pred'] is not None:
-    mortality_output.markdown(
-        f"<p style='font-size:36px; font-weight:bold; color:#d62728;'>{st.session_state['last_pred']:.1%}</p>",
-        unsafe_allow_html=True
-    )
+# === Reset Button ===
+if st.button("Reset Form"):
+    for key in st.session_state.keys():
+        del st.session_state[key]
+    st.rerun()
 
-
-# # === Reset Button ===
-# if st.button("Reset Form"):
-#     for key in st.session_state.keys():
-#         del st.session_state[key]
-
-#     st.rerun()
 
 
 
