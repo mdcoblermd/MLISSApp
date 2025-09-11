@@ -11,7 +11,10 @@ import pandas as pd
 import numpy as np
 import re
 
-# ---------- Page setup ----------
+# ---------------- Settings ----------------
+BOXED = True   # <- set to False for no boxes around the two sections
+
+# -------------- Page setup ---------------
 st.set_page_config(page_title="RT-MLISS", layout="centered")
 st.markdown("""
 <style>
@@ -22,7 +25,7 @@ label { margin-bottom: 0.2rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Load artifacts (cached) ----------
+# ----------- Load artifacts (cached) -----------
 @st.cache_resource
 def load_artifacts():
     with open("calibrated_model2.pkl", "rb") as f:
@@ -33,7 +36,7 @@ def load_artifacts():
 
 model, scaler = load_artifacts()
 
-# ---------- Title & intro ----------
+# -------------- Title / intro --------------
 st.title("RT-MLISS Score")
 st.markdown("""
 <h4 style='margin-top:-10px;color:gray;'>A real-time mortality prediction tool for trauma patients</h4>
@@ -43,7 +46,7 @@ JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, N Nam
 </p>
 """, unsafe_allow_html=True)
 
-# ---------- Helpers (live inputs; namespaced keys; no reset on rerun) ----------
+# -------------- Helpers (live inputs) --------------
 def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
     raw_key = f"numraw_{key}"
     if raw_key not in st.session_state:
@@ -72,7 +75,7 @@ def float_input_live(label, key, min_val=None, max_val=None, placeholder=""):
         return v
     return np.nan
 
-# ---------- Labels / bounds ----------
+# -------------- Labels / bounds --------------
 label_map = {
     'TRAUMATYPE': "Trauma Type",
     'AGEYEARS': "Age",
@@ -82,14 +85,13 @@ label_map = {
     'PULSERATE': "Arrival Heart Rate",
     'WEIGHT': "Weight (kg)"
 }
-
 bounds = {
-    'AGEYEARS': (0, 150),
+    'AGEYEARS': (0, 110),
     'TOTALGCS': (3, 15),
-    'SBP': (0, 300),
-    'TEMPERATURE': (0, 100),     # °C
-    'PULSERATE': (0, 320),
-    'WEIGHT': (2, 500),
+    'SBP': (40, 260),
+    'TEMPERATURE': (30, 43),   # °C
+    'PULSERATE': (20, 220),
+    'WEIGHT': (2, 400),
 }
 
 frontend_labels = {
@@ -126,7 +128,6 @@ frontend_labels = {
     "Lower Extremity Amputation (other than toe)": "LEAmputation",
     "Lower Extremity Long Bone Fracture": "LELongBoneFx"
 }
-
 injury_categories_display = {
     "Head injury?": [
         "Intracranial Vascular Injury", "Brain Stem Injury", "Epidural Hematoma (EDH)",
@@ -152,37 +153,37 @@ injury_categories_display = {
     ]
 }
 
-# ---------- Layout: two columns side-by-side ----------
+# -------------- Layout: side-by-side --------------
 col_vitals, _, col_injury = st.columns([2, 0.4, 2])
 
-# RIGHT column: Injury Pattern (outside form so expanders appear instantly)
-with col_injury:
-    st.subheader("Injury Pattern")
-    injury_inputs = {}
-    for region_label, subqs in injury_categories_display.items():
-        has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
-                              key=f"region_{region_label}")
-        if has_injury == 'Yes':
-            with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
+# RIGHT column: Injury Pattern (updates instantly)
+injury_inputs = {}
+with (st.container(border=BOXED) if BOXED else st.container()):
+    with col_injury:
+        st.subheader("Injury Pattern")
+        for region_label, subqs in injury_categories_display.items():
+            has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
+                                  key=f"region_{region_label}")
+            if has_injury == 'Yes':
+                with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
+                    for disp in subqs:
+                        backend_var = frontend_labels[disp]
+                        picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
+                                          key=f"inj_{backend_var}")
+                        injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+            else:
                 for disp in subqs:
                     backend_var = frontend_labels[disp]
-                    picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
-                                      key=f"inj_{backend_var}")
-                    injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
-        else:
-            for disp in subqs:
-                backend_var = frontend_labels[disp]
-                injury_inputs[backend_var] = 0
+                    injury_inputs[backend_var] = 0
 
-# LEFT column: Vitals + Predict button (inside form)
-with col_vitals:
-    with st.form("rtmliss_form", clear_on_submit=False):
-        user_inputs = {}
-        sbp_val = np.nan
-        pulse_val = np.nan
+# LEFT column: Vitals (live), trauma type, and derived features
+user_inputs = {}
+sbp_val = np.nan
+pulse_val = np.nan
 
+with (st.container(border=BOXED) if BOXED else st.container()):
+    with col_vitals:
         st.subheader("Patient Info & Vitals")
-
         trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
                                index=0, horizontal=True, key='TRAUMATYPE')
         user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
@@ -206,27 +207,30 @@ with col_vitals:
         else:
             user_inputs['ShockIndex'] = np.nan
 
-        # Merge injury selections into inputs at submit time
-        user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
-        user_inputs.update(injury_inputs)
+# Merge injury selections
+user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
+user_inputs.update(injury_inputs)
 
-        # Build X in model's expected order (NaNs allowed)
-        X = None
-        try:
-            X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
-        except Exception as e:
-            st.error(f"Column alignment error: {e}")
+# -------------- Predict button (below both columns) --------------
+st.markdown("---")
+btn_col = st.container()
+with btn_col:
+    clicked = st.button("Predict Mortality")
 
-        submitted = st.form_submit_button("Predict Mortality")
-
-# ---------- Output (persist last prediction) ----------
+# -------------- Output (persist last prediction) --------------
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
 mortality_output = st.empty()
-
 if 'last_pred' not in st.session_state:
     st.session_state['last_pred'] = None
 
-if submitted and X is not None:
+# Build X in model's expected order; NaNs allowed
+X = None
+try:
+    X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
+except Exception as e:
+    mortality_output.error(f"Column alignment error: {e}")
+
+if clicked and X is not None:
     try:
         X_scaled = scaler.transform(X)
         pred = float(model.predict_proba(X_scaled)[:, 1][0])
@@ -241,7 +245,7 @@ if st.session_state['last_pred'] is not None:
         unsafe_allow_html=True
     )
 
-# ---------- Reset (only clears our own keys) ----------
+# -------------- Reset (only clears our own keys) --------------
 if st.button("Reset Form"):
     keys_to_clear = [k for k in st.session_state.keys()
                      if k.startswith("numraw_")
@@ -251,4 +255,5 @@ if st.button("Reset Form"):
     for k in list(set(keys_to_clear)):
         del st.session_state[k]
     st.rerun()
+
 
