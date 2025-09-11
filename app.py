@@ -281,11 +281,6 @@ input_df = pd.DataFrame([user_inputs])
 #         unsafe_allow_html=True
 #     )
     
-# Always show the heading
-st.markdown("### RT-MLISS Score (Predicted Mortality):")
-
-# Placeholder for the dynamic result
-mortality_output = st.empty()
 
 # Prediction button logic
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
@@ -352,6 +347,7 @@ else:
 #         del st.session_state[key]
 
 #     st.rerun()
+
 
 
 
