@@ -12,7 +12,7 @@ import numpy as np
 import re
 
 # ---------------- Settings ----------------
-BOXED = True   # <- set to False for no boxes around the two sections
+BOXED = False   # <- set to False for no boxes around the two sections
 
 # -------------- Page setup ---------------
 st.set_page_config(page_title="RT-MLISS", layout="centered")
@@ -255,6 +255,7 @@ if st.button("Reset Form"):
     for k in list(set(keys_to_clear)):
         del st.session_state[k]
     st.rerun()
+
 
 
 
