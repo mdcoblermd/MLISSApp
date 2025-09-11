@@ -65,7 +65,7 @@ st.markdown(
     <p style='font-size:16x; color: #555; font-style: italic;'>
         Our models are calibrated such that the outputted scores reflects an accurate prediction
         of the true probability of in-hospital mortality based on our training data
-    </p>,
+    </p>
     """,
     unsafe_allow_html=True
 )
@@ -253,4 +253,5 @@ if st.button("Reset Form"):
         del st.session_state[key]
 
     st.rerun()
+
 
