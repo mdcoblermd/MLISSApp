@@ -19,6 +19,37 @@ st.markdown("""
 html, body, [class*="css"] { font-size: 1.10rem; }
 input, select, textarea { font-size: 1.0rem !important; }
 label { margin-bottom: 0.2rem !important; }
+
+/* Region card */
+.region-card {
+  padding: 0.75rem 0.9rem;
+  margin: 0.4rem 0 0.9rem 0;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+}
+
+/* Submenu look for specific injuries */
+.submenu {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 4px solid #d0d7de;
+  background: #fafbfc;
+  border-radius: 6px;
+}
+.submenu-title {
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 0.3rem;
+}
+.submenu .stRadio > label { font-weight: 500; }
+
+/* Vitals card to match */
+.vitals-card {
+  padding: 0.9rem 1.0rem;
+  margin: 0.4rem 0 0.9rem 0;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -43,7 +74,7 @@ JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, N Nam
 </p>
 """, unsafe_allow_html=True)
 
-# ---------------- Helpers (live inputs) ----------------
+# ---------------- Helpers (live inputs that never reset) ----------------
 def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
     raw_key = f"numraw_{key}"
     if raw_key not in st.session_state:
@@ -156,6 +187,8 @@ col_vitals, _, col_injury = st.columns([2, 0.4, 2])
 # Vitals (left)
 with col_vitals:
     st.subheader("Patient Info & Vitals")
+    st.markdown("<div class='vitals-card'>", unsafe_allow_html=True)
+
     user_inputs = {}
     sbp_val = np.nan
     pulse_val = np.nan
@@ -174,7 +207,6 @@ with col_vitals:
         if var == 'SBP': sbp_val = val
         if var == 'PULSERATE': pulse_val = val
 
-    # ShockIndex
     if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
         and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
         user_inputs['ShockIndex'] = pulse_val / sbp_val
@@ -183,24 +215,36 @@ with col_vitals:
     else:
         user_inputs['ShockIndex'] = np.nan
 
-# Injury Pattern (right)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Injury Pattern (right) with submenu styling
 with col_injury:
     st.subheader("Injury Pattern")
     injury_inputs = {}
+
     for region_label, subqs in injury_categories_display.items():
-        has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
-                              key=f"region_{region_label}")
-        if has_injury == 'Yes':
-            st.markdown(f"**Specify injuries for {region_label.replace(' injury?', '')}:**")
+        st.markdown("<div class='region-card'>", unsafe_allow_html=True)
+
+        # Region-level Yes/No
+        choice = st.radio(region_label, ['No', 'Yes'], index=0,
+                          horizontal=True, key=f"region_{region_label}")
+
+        # Submenu appears only if 'Yes'
+        if choice == 'Yes':
+            st.markdown(f"<div class='submenu'><div class='submenu-title'>Specify injuries for {region_label.replace(' injury?', '')}</div>",
+                        unsafe_allow_html=True)
             for disp in subqs:
                 backend_var = frontend_labels[disp]
                 picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
                                   key=f"inj_{backend_var}")
                 injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+            st.markdown("</div>", unsafe_allow_html=True)
         else:
             for disp in subqs:
                 backend_var = frontend_labels[disp]
                 injury_inputs[backend_var] = 0
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # Merge injuries
 user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
@@ -247,3 +291,4 @@ if st.button("Reset Form"):
     for k in list(set(keys_to_clear)):
         del st.session_state[k]
     st.rerun()
+
