@@ -89,7 +89,7 @@ label_map = {
 bounds = {
     'AGEYEARS': (0, 150),
     'TOTALGCS': (3, 15),
-    'SBP': 0, 360),
+    'SBP': (0, 360),
     'TEMPERATURE': (0, 93),     # °C
     'PULSERATE': (0, 320),
     'WEIGHT': (2, 500),
@@ -255,5 +255,6 @@ if st.button("Reset Form"):
     for k in list(set(keys_to_clear)):
         del st.session_state[k]
     st.rerun()
+
 
 
