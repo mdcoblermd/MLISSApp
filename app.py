@@ -25,12 +25,12 @@ st.markdown("""
 
     /* Make fonts more legible */
     html, body, [class*="css"]  {
-        font-size: 1.25rem;
+        font-size: 1.15rem;
     }
 
     /* Optional: make input boxes bigger */
     input, select, textarea {
-        font-size: 1.1rem !important;
+        font-size: 1.0rem !important;
     }
 
     /* Reduce vertical whitespace between form elements */
@@ -251,4 +251,5 @@ if st.button("Predict Mortality"):
 if st.button("Reset Form"):
     for key in st.session_state.keys():
         del st.session_state[key]
+
     st.rerun()
