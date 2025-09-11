@@ -248,12 +248,13 @@ if st.button("Predict Mortality"):
     except Exception as e:
         mortality_output.error(f"Error: {e}")
 
-# === Reset Button ===
-if st.button("Reset Form"):
-    for key in st.session_state.keys():
-        del st.session_state[key]
+# # === Reset Button ===
+# if st.button("Reset Form"):
+#     for key in st.session_state.keys():
+#         del st.session_state[key]
 
-    st.rerun()
+#     st.rerun()
+
 
 
 
