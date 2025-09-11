@@ -59,7 +59,7 @@ st.markdown(
         A real-time mortality prediction tool for trauma patients
     </h4>
     <p style='font-size:18px; color: #555; font-style: bold;'>
-        Developed by MD Cobler-Lichter MD MSDS, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
+        Developed by <b>MD Cobler-Lichter MD MSDS</b>, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
         JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, N Namias MD MBA
     </p>
     <p style='font-size:16x; color: #555; font-style: italic;'>
@@ -253,5 +253,6 @@ if st.button("Reset Form"):
         del st.session_state[key]
 
     st.rerun()
+
 
 
