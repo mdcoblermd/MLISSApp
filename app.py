@@ -41,9 +41,6 @@ st.markdown("""
 Developed by <b>MD Cobler-Lichter MD MSDS</b>, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
 JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, N Namias MD MBA
 </p>
-<p style='font-size:16px;color:#555;'>
-Models are calibrated so the output reflects the predicted probability of in-hospital mortality based on the training data.
-</p>
 """, unsafe_allow_html=True)
 
 # ---------- Helpers (live inputs; namespaced keys; no reset on rerun) ----------
@@ -91,7 +88,7 @@ bounds = {
     'TOTALGCS': (3, 15),
     'SBP': (0, 300),
     'TEMPERATURE': (0, 100),     # °C
-    'PULSERATE': (0, 350),
+    'PULSERATE': (0, 320),
     'WEIGHT': (2, 500),
 }
 
@@ -155,34 +152,37 @@ injury_categories_display = {
     ]
 }
 
-# ---------- Injury Pattern (OUTSIDE the form so it updates instantly) ----------
-st.subheader("Injury Pattern")
-injury_inputs = {}
-for region_label, subqs in injury_categories_display.items():
-    has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
-                          key=f"region_{region_label}")
-    if has_injury == 'Yes':
-        with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
+# ---------- Layout: two columns side-by-side ----------
+col_vitals, _, col_injury = st.columns([2, 0.4, 2])
+
+# RIGHT column: Injury Pattern (outside form so expanders appear instantly)
+with col_injury:
+    st.subheader("Injury Pattern")
+    injury_inputs = {}
+    for region_label, subqs in injury_categories_display.items():
+        has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
+                              key=f"region_{region_label}")
+        if has_injury == 'Yes':
+            with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
+                for disp in subqs:
+                    backend_var = frontend_labels[disp]
+                    picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
+                                      key=f"inj_{backend_var}")
+                    injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+        else:
             for disp in subqs:
                 backend_var = frontend_labels[disp]
-                picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
-                                  key=f"inj_{backend_var}")
-                injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
-    else:
-        for disp in subqs:
-            backend_var = frontend_labels[disp]
-            injury_inputs[backend_var] = 0
+                injury_inputs[backend_var] = 0
 
-# ---------- Patient Info & Vitals + Predict BUTTON (INSIDE a form) ----------
-with st.form("rtmliss_form", clear_on_submit=False):
-    user_inputs = {}
-    sbp_val = np.nan
-    pulse_val = np.nan
+# LEFT column: Vitals + Predict button (inside form)
+with col_vitals:
+    with st.form("rtmliss_form", clear_on_submit=False):
+        user_inputs = {}
+        sbp_val = np.nan
+        pulse_val = np.nan
 
-    col1, _, col2 = st.columns([2, 1, 2])
-
-    with col1:
         st.subheader("Patient Info & Vitals")
+
         trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
                                index=0, horizontal=True, key='TRAUMATYPE')
         user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
@@ -197,7 +197,7 @@ with st.form("rtmliss_form", clear_on_submit=False):
             if var == 'SBP': sbp_val = val
             if var == 'PULSERATE': pulse_val = val
 
-        # ShockIndex
+        # ShockIndex (NaN-safe)
         if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
             and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
             user_inputs['ShockIndex'] = pulse_val / sbp_val
@@ -206,22 +206,18 @@ with st.form("rtmliss_form", clear_on_submit=False):
         else:
             user_inputs['ShockIndex'] = np.nan
 
-    with col2:
-        st.subheader("Summary")
+        # Merge injury selections into inputs at submit time
         user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
-        st.write(f"Number of injuries selected: **{user_inputs['NumberOfInjuries']}**")
+        user_inputs.update(injury_inputs)
 
-    # Merge injury inputs inside the form (so X is complete at submit time)
-    user_inputs.update(injury_inputs)
+        # Build X in model's expected order (NaNs allowed)
+        X = None
+        try:
+            X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
+        except Exception as e:
+            st.error(f"Column alignment error: {e}")
 
-    # Build X in model's expected order (NaNs allowed)
-    X = None
-    try:
-        X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
-    except Exception as e:
-        st.error(f"Column alignment error: {e}")
-
-    submitted = st.form_submit_button("Predict Mortality")
+        submitted = st.form_submit_button("Predict Mortality")
 
 # ---------- Output (persist last prediction) ----------
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
