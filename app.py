@@ -282,64 +282,37 @@ input_df = pd.DataFrame([user_inputs])
 #     )
     
 
-# Prediction button logic
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
 mortality_output = st.empty()
 
-# Which fields must be present to enable Predict?
-required = ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']
-
-# Build the one-row frame in the model’s expected column order
+# Build DataFrame in model’s expected order (NaNs are fine)
 try:
     X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
 except Exception as e:
     mortality_output.error(f"Column alignment error: {e}")
     X = None
 
-inputs_ready = X is not None and not X.isna().any(axis=1).item()
-
-# Session storage for last prediction and last inputs signature
+# Session storage for last prediction
 if 'last_pred' not in st.session_state:
     st.session_state['last_pred'] = None
-if 'last_sig' not in st.session_state:
-    st.session_state['last_sig'] = None
-
-def make_signature(df_row: pd.DataFrame) -> tuple:
-    # Deterministic, NaN-safe signature of current inputs (in model column order)
-    s = df_row.iloc[0].astype(object)
-    return tuple(None if pd.isna(v) else float(v) for v in s)
-
-current_sig = make_signature(X) if X is not None else None
-changed_since_last = (current_sig is not None and 
-                      st.session_state['last_sig'] is not None and 
-                      current_sig != st.session_state['last_sig'])
 
 # Predict button
-clicked = st.button("Predict Mortality", disabled=not inputs_ready)
-
-if clicked and inputs_ready:
+if st.button("Predict Mortality") and X is not None:
     try:
         X_scaled = scaler.transform(X)
         pred = float(model.predict_proba(X_scaled)[:, 1][0])
         st.session_state['last_pred'] = pred
-        st.session_state['last_sig']  = current_sig
     except Exception as e:
         st.session_state['last_pred'] = None
         mortality_output.error(f"Error during prediction: {e}")
 
-# Show result (persist across reruns)
+# Show result if we have one
 if st.session_state['last_pred'] is not None:
     mortality_output.markdown(
         f"<p style='font-size:36px; font-weight:bold; color:#d62728;'>{st.session_state['last_pred']:.1%}</p>",
         unsafe_allow_html=True
     )
-    if changed_since_last:
-        st.caption("Inputs changed since last prediction — press **Predict Mortality** to refresh.")
-else:
-    if not inputs_ready:
-        missing = [k for k in required if pd.isna(user_inputs.get(k))]
-        if missing:
-            st.info("Enter all required fields to enable **Predict Mortality**.")
+
 
 # # === Reset Button ===
 # if st.button("Reset Form"):
@@ -347,6 +320,7 @@ else:
 #         del st.session_state[key]
 
 #     st.rerun()
+
 
 
 
