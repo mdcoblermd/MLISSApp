@@ -37,10 +37,10 @@ model, scaler = load_artifacts()
 st.title("RT-MLISS Score")
 st.markdown("""
 <h4 style='margin-top:-8px;color:gray;'>A real-time mortality prediction tool for trauma patients</h4>
-<p style='font-size:16px;color:#555;'>
-##Developed by <b>MD Cobler-Lichter MD MSDS</b>, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
-##JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, T Loftus MD PHD, N Namias MD MBA
-</p>
+#<p style='font-size:16px;color:#555;'>
+#Developed by <b>MD Cobler-Lichter MD MSDS</b>, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
+#JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, T Loftus MD PHD, N Namias MD MBA
+#</p>
 <p style='font-size:14px;color:#555;'>
 Models are calibrated so the output reflects the predicted probability of in-hospital mortality based on the training data.
 </p>
