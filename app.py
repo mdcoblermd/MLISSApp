@@ -155,45 +155,48 @@ injury_categories_display = {
     ]
 }
 
-# ---------- Inputs ----------
-with st.form("rtmliss_form", clear_on_submit=False):
-    left_col, right_col = st.columns(2)
+# ---------- Main two-column layout ----------
+left_col, right_col = st.columns(2)
+
+# ---------- Injury Pattern: OUTSIDE form so Yes updates instantly ----------
+with left_col:
+    st.subheader("Injury Pattern")
 
     injury_inputs = {}
 
-    with left_col:
-        st.subheader("Injury Pattern")
+    for region_label, subqs in injury_categories_display.items():
+        has_injury = st.radio(
+            region_label,
+            ['No', 'Yes'],
+            index=0,
+            horizontal=True,
+            key=f"region_{region_label}"
+        )
 
-        for region_label, subqs in injury_categories_display.items():
-            has_injury = st.radio(
-                region_label,
-                ['No', 'Yes'],
-                index=0,
-                horizontal=True,
-                key=f"region_{region_label}"
-            )
-
-            if has_injury == 'Yes':
-                with st.expander(
-                    f"Specify injuries for {region_label.replace(' injury?', '')}",
-                    expanded=False
-                ):
-                    for disp in subqs:
-                        backend_var = frontend_labels[disp]
-                        picked = st.radio(
-                            disp,
-                            ['No', 'Yes'],
-                            index=0,
-                            horizontal=True,
-                            key=f"inj_{backend_var}"
-                        )
-                        injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
-            else:
+        if has_injury == 'Yes':
+            with st.expander(
+                f"Specify injuries for {region_label.replace(' injury?', '')}",
+                expanded=True
+            ):
                 for disp in subqs:
                     backend_var = frontend_labels[disp]
-                    injury_inputs[backend_var] = 0
+                    picked = st.radio(
+                        disp,
+                        ['No', 'Yes'],
+                        index=0,
+                        horizontal=True,
+                        key=f"inj_{backend_var}"
+                    )
+                    injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+        else:
+            for disp in subqs:
+                backend_var = frontend_labels[disp]
+                injury_inputs[backend_var] = 0
 
-    with right_col:
+
+# ---------- Patient Info & Vitals: INSIDE form ----------
+with right_col:
+    with st.form("rtmliss_form", clear_on_submit=False):
         st.subheader("Patient Info & Vitals")
 
         user_inputs = {}
@@ -237,16 +240,16 @@ with st.form("rtmliss_form", clear_on_submit=False):
         else:
             user_inputs['ShockIndex'] = np.nan
 
-    user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
-    user_inputs.update(injury_inputs)
+        user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
+        user_inputs.update(injury_inputs)
 
-    try:
-        X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
-    except Exception as e:
-        X = None
-        st.error(f"Column alignment error: {e}")
+        try:
+            X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
+        except Exception as e:
+            X = None
+            st.error(f"Column alignment error: {e}")
 
-    submitted = st.form_submit_button("Predict Mortality")
+        submitted = st.form_submit_button("Predict Mortality")
 
 # ---------- Output (persist last prediction) ----------
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
