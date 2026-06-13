@@ -299,10 +299,6 @@ if st.session_state['last_pred'] is not None:
 
 st.markdown("---")
 
-submitted = st.button(
-    "Predict Mortality",
-    use_container_width=True
-)
 
 st.button(
     "Reset Form",
