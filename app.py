@@ -75,6 +75,26 @@ def float_input_live(label, key, min_val=None, max_val=None, placeholder=""):
         return v
     return np.nan
 
+
+# ---------- Reset helper ----------
+def reset_form():
+    keys_to_delete = []
+
+    for k in st.session_state.keys():
+        if (
+            k.startswith("numraw_")
+            or k.startswith("region_")
+            or k.startswith("inj_")
+            or k == "TRAUMATYPE"
+            or k == "last_pred"
+        ):
+            keys_to_delete.append(k)
+
+    for k in keys_to_delete:
+        del st.session_state[k]
+
+
+
 # ---------- Labels / bounds ----------
 label_map = {
     'TRAUMATYPE': "Trauma Type",
@@ -277,27 +297,16 @@ if st.session_state['last_pred'] is not None:
         unsafe_allow_html=True
     )
 
-# ---------- Reset ----------
-if st.button("Reset Form"):
-    # Clear text inputs
-    for k in list(st.session_state.keys()):
-        if k.startswith("numraw_"):
-            st.session_state[k] = ""
+st.markdown("---")
 
-    # Reset trauma type
-    st.session_state["TRAUMATYPE"] = "Blunt"
+submitted = st.button(
+    "Predict Mortality",
+    use_container_width=True
+)
 
-    # Reset injury region radios
-    for region_label in injury_categories_display.keys():
-        st.session_state[f"region_{region_label}"] = "No"
-
-    # Reset specific injury radios
-    for backend_var in frontend_labels.values():
-        st.session_state[f"inj_{backend_var}"] = "No"
-
-    # Clear last prediction
-    st.session_state["last_pred"] = None
-
-    st.rerun()
-
+st.button(
+    "Reset Form",
+    on_click=reset_form,
+    use_container_width=True
+)
 
