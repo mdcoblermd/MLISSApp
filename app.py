@@ -270,7 +270,7 @@ submitted = st.button(
 )
 
 # ---------- Output ----------
-st.markdown("### RT-MLISS Score (Predicted Mortality):")
+st.markdown("### ML-ISS Score (Predicted Mortality):")
 mortality_output = st.empty()
 
 if "last_pred" not in st.session_state:
