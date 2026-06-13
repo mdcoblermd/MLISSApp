@@ -263,9 +263,9 @@ def run_prediction():
 # ---------- Predict button ----------
 st.markdown("---")
 
-st.button(
+submitted = st.button(
     "Predict Mortality",
-    on_click=run_prediction,
+    key="predict_button",
     use_container_width=True
 )
 
@@ -276,13 +276,16 @@ mortality_output = st.empty()
 if "last_pred" not in st.session_state:
     st.session_state["last_pred"] = None
 
-if "prediction_error" not in st.session_state:
-    st.session_state["prediction_error"] = None
+if submitted and X is not None:
+    try:
+        X_scaled = scaler.transform(X)
+        pred = float(model.predict_proba(X_scaled)[:, 1][0])
+        st.session_state["last_pred"] = pred
+    except Exception as e:
+        st.session_state["last_pred"] = None
+        mortality_output.error(f"Error during prediction: {e}")
 
-if st.session_state["prediction_error"]:
-    mortality_output.error(f"Error during prediction: {st.session_state['prediction_error']}")
-
-elif st.session_state["last_pred"] is not None:
+if st.session_state["last_pred"] is not None:
     mortality_output.markdown(
         f"<p style='font-size:36px;font-weight:bold;color:#d62728;'>{st.session_state['last_pred']:.1%}</p>",
         unsafe_allow_html=True
