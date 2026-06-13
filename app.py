@@ -34,7 +34,7 @@ def load_artifacts():
 model, scaler = load_artifacts()
 
 # ---------- Title & intro ----------
-st.title("RT-MLISS Score")
+st.title("ML-ISS Score")
 st.markdown("""
 <h4 style='margin-top:-8px;color:gray;'>A real-time mortality prediction tool for trauma patients</h4>
 <p style='font-size:14px;color:#555;'>
