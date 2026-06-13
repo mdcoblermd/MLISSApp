@@ -155,70 +155,95 @@ injury_categories_display = {
     ]
 }
 
-# ---------- Injury Pattern (OUTSIDE the form so it updates instantly) ----------
-st.subheader("Injury Pattern")
-injury_inputs = {}
-for region_label, subqs in injury_categories_display.items():
-    has_injury = st.radio(region_label, ['No', 'Yes'], index=0, horizontal=True,
-                          key=f"region_{region_label}")
-    if has_injury == 'Yes':
-        with st.expander(f"Specify injuries for {region_label.replace(' injury?', '')}", expanded=False):
-            for disp in subqs:
-                backend_var = frontend_labels[disp]
-                picked = st.radio(disp, ['No','Yes'], index=0, horizontal=True,
-                                  key=f"inj_{backend_var}")
-                injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
-    else:
-        for disp in subqs:
-            backend_var = frontend_labels[disp]
-            injury_inputs[backend_var] = 0
-
-# ---------- Patient Info & Vitals + Predict BUTTON (INSIDE a form) ----------
+# ---------- Inputs ----------
 with st.form("rtmliss_form", clear_on_submit=False):
-    user_inputs = {}
-    sbp_val = np.nan
-    pulse_val = np.nan
+    left_col, right_col = st.columns(2)
 
-    col1, _, col2 = st.columns([2, 1, 2])
+    injury_inputs = {}
 
-    with col1:
+    with left_col:
+        st.subheader("Injury Pattern")
+
+        for region_label, subqs in injury_categories_display.items():
+            has_injury = st.radio(
+                region_label,
+                ['No', 'Yes'],
+                index=0,
+                horizontal=True,
+                key=f"region_{region_label}"
+            )
+
+            if has_injury == 'Yes':
+                with st.expander(
+                    f"Specify injuries for {region_label.replace(' injury?', '')}",
+                    expanded=False
+                ):
+                    for disp in subqs:
+                        backend_var = frontend_labels[disp]
+                        picked = st.radio(
+                            disp,
+                            ['No', 'Yes'],
+                            index=0,
+                            horizontal=True,
+                            key=f"inj_{backend_var}"
+                        )
+                        injury_inputs[backend_var] = 1 if picked == 'Yes' else 0
+            else:
+                for disp in subqs:
+                    backend_var = frontend_labels[disp]
+                    injury_inputs[backend_var] = 0
+
+    with right_col:
         st.subheader("Patient Info & Vitals")
-        trauma_type = st.radio(label_map['TRAUMATYPE'], ['Blunt', 'Penetrating'],
-                               index=0, horizontal=True, key='TRAUMATYPE')
+
+        user_inputs = {}
+        sbp_val = np.nan
+        pulse_val = np.nan
+
+        trauma_type = st.radio(
+            label_map['TRAUMATYPE'],
+            ['Blunt', 'Penetrating'],
+            index=0,
+            horizontal=True,
+            key='TRAUMATYPE'
+        )
         user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
 
-        for var in ['AGEYEARS','TOTALGCS','SBP','TEMPERATURE','PULSERATE','WEIGHT']:
+        for var in ['AGEYEARS', 'TOTALGCS', 'SBP', 'TEMPERATURE', 'PULSERATE', 'WEIGHT']:
             lo, hi = bounds[var]
+
             if var == 'TEMPERATURE':
                 val = float_input_live(label_map[var], var, min_val=lo, max_val=hi)
             else:
                 val = int_input_live(label_map[var], var, min_val=lo, max_val=hi)
-            user_inputs[var] = val
-            if var == 'SBP': sbp_val = val
-            if var == 'PULSERATE': pulse_val = val
 
-        # ShockIndex
-        if (isinstance(sbp_val, (int, float)) and isinstance(pulse_val, (int, float))
-            and not np.isnan(sbp_val) and not np.isnan(pulse_val) and sbp_val != 0):
+            user_inputs[var] = val
+
+            if var == 'SBP':
+                sbp_val = val
+            if var == 'PULSERATE':
+                pulse_val = val
+
+        if (
+            isinstance(sbp_val, (int, float))
+            and isinstance(pulse_val, (int, float))
+            and not np.isnan(sbp_val)
+            and not np.isnan(pulse_val)
+            and sbp_val != 0
+        ):
             user_inputs['ShockIndex'] = pulse_val / sbp_val
         elif sbp_val == 0 or pulse_val == 0:
             user_inputs['ShockIndex'] = 2.0
         else:
             user_inputs['ShockIndex'] = np.nan
 
-    with col2:
-        st.subheader("Summary")
-        user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
-        st.write(f"Number of injuries selected: **{user_inputs['NumberOfInjuries']}**")
-
-    # Merge injury inputs inside the form (so X is complete at submit time)
+    user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
     user_inputs.update(injury_inputs)
 
-    # Build X in model's expected order (NaNs allowed)
-    X = None
     try:
         X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
     except Exception as e:
+        X = None
         st.error(f"Column alignment error: {e}")
 
     submitted = st.form_submit_button("Predict Mortality")
