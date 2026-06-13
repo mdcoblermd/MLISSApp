@@ -158,7 +158,7 @@ injury_categories_display = {
 # ---------- Main two-column layout ----------
 left_col, right_col = st.columns(2)
 
-# ---------- Injury Pattern: OUTSIDE form so Yes updates instantly ----------
+# ---------- Injury Pattern ----------
 with left_col:
     st.subheader("Injury Pattern")
 
@@ -194,62 +194,66 @@ with left_col:
                 injury_inputs[backend_var] = 0
 
 
-# ---------- Patient Info & Vitals: INSIDE form ----------
+# ---------- Patient Info & Vitals ----------
 with right_col:
-    with st.form("rtmliss_form", clear_on_submit=False):
-        st.subheader("Patient Info & Vitals")
+    st.subheader("Patient Info & Vitals")
 
-        user_inputs = {}
-        sbp_val = np.nan
-        pulse_val = np.nan
+    user_inputs = {}
+    sbp_val = np.nan
+    pulse_val = np.nan
 
-        trauma_type = st.radio(
-            label_map['TRAUMATYPE'],
-            ['Blunt', 'Penetrating'],
-            index=0,
-            horizontal=True,
-            key='TRAUMATYPE'
-        )
-        user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
+    trauma_type = st.radio(
+        label_map['TRAUMATYPE'],
+        ['Blunt', 'Penetrating'],
+        index=0,
+        horizontal=True,
+        key='TRAUMATYPE'
+    )
+    user_inputs['Penetrating'] = 1 if trauma_type == 'Penetrating' else 0
 
-        for var in ['AGEYEARS', 'TOTALGCS', 'SBP', 'TEMPERATURE', 'PULSERATE', 'WEIGHT']:
-            lo, hi = bounds[var]
+    for var in ['AGEYEARS', 'TOTALGCS', 'SBP', 'TEMPERATURE', 'PULSERATE', 'WEIGHT']:
+        lo, hi = bounds[var]
 
-            if var == 'TEMPERATURE':
-                val = float_input_live(label_map[var], var, min_val=lo, max_val=hi)
-            else:
-                val = int_input_live(label_map[var], var, min_val=lo, max_val=hi)
-
-            user_inputs[var] = val
-
-            if var == 'SBP':
-                sbp_val = val
-            if var == 'PULSERATE':
-                pulse_val = val
-
-        if (
-            isinstance(sbp_val, (int, float))
-            and isinstance(pulse_val, (int, float))
-            and not np.isnan(sbp_val)
-            and not np.isnan(pulse_val)
-            and sbp_val != 0
-        ):
-            user_inputs['ShockIndex'] = pulse_val / sbp_val
-        elif sbp_val == 0 or pulse_val == 0:
-            user_inputs['ShockIndex'] = 2.0
+        if var == 'TEMPERATURE':
+            val = float_input_live(label_map[var], var, min_val=lo, max_val=hi)
         else:
-            user_inputs['ShockIndex'] = np.nan
+            val = int_input_live(label_map[var], var, min_val=lo, max_val=hi)
 
-        user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
-        user_inputs.update(injury_inputs)
+        user_inputs[var] = val
 
-        try:
-            X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
-        except Exception as e:
-            X = None
-            st.error(f"Column alignment error: {e}")
+        if var == 'SBP':
+            sbp_val = val
+        if var == 'PULSERATE':
+            pulse_val = val
 
-        submitted = st.form_submit_button("Predict Mortality")
+
+# ---------- Derived variables ----------
+if (
+    isinstance(sbp_val, (int, float))
+    and isinstance(pulse_val, (int, float))
+    and not np.isnan(sbp_val)
+    and not np.isnan(pulse_val)
+    and sbp_val != 0
+):
+    user_inputs['ShockIndex'] = pulse_val / sbp_val
+elif sbp_val == 0 or pulse_val == 0:
+    user_inputs['ShockIndex'] = 2.0
+else:
+    user_inputs['ShockIndex'] = np.nan
+
+user_inputs['NumberOfInjuries'] = int(sum(injury_inputs.values()))
+user_inputs.update(injury_inputs)
+
+try:
+    X = pd.DataFrame([user_inputs], columns=scaler.feature_names_in_)
+except Exception as e:
+    X = None
+    st.error(f"Column alignment error: {e}")
+
+
+# ---------- Predict button ----------
+st.markdown("---")
+submitted = st.button("Predict Mortality", use_container_width=True)
 
 # ---------- Output (persist last prediction) ----------
 st.markdown("### RT-MLISS Score (Predicted Mortality):")
