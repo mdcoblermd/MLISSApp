@@ -300,9 +300,10 @@ if st.session_state['last_pred'] is not None:
 st.markdown("---")
 
 
-st.button(
-    "Reset Form",
-    on_click=reset_form,
-    use_container_width=True
-)
+if False:
+    st.button(
+        "Reset Form",
+        on_click=reset_form,
+        use_container_width=True
+    )
 
