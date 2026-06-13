@@ -277,16 +277,27 @@ if st.session_state['last_pred'] is not None:
         unsafe_allow_html=True
     )
 
-# ---------- Reset (only clears our own keys) ----------
+# ---------- Reset ----------
 if st.button("Reset Form"):
-    keys_to_clear = [k for k in st.session_state.keys()
-                     if k.startswith("numraw_")
-                     or k.startswith("region_")
-                     or k.startswith("inj_")
-                     or k in ['TRAUMATYPE','last_pred']]
-    for k in list(set(keys_to_clear)):
-        del st.session_state[k]
-    st.rerun()
+    # Clear text inputs
+    for k in list(st.session_state.keys()):
+        if k.startswith("numraw_"):
+            st.session_state[k] = ""
 
+    # Reset trauma type
+    st.session_state["TRAUMATYPE"] = "Blunt"
+
+    # Reset injury region radios
+    for region_label in injury_categories_display.keys():
+        st.session_state[f"region_{region_label}"] = "No"
+
+    # Reset specific injury radios
+    for backend_var in frontend_labels.values():
+        st.session_state[f"inj_{backend_var}"] = "No"
+
+    # Clear last prediction
+    st.session_state["last_pred"] = None
+
+    st.rerun()
 
 
