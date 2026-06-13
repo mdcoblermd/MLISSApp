@@ -22,7 +22,7 @@ label { margin-bottom: 0.2rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Load artifacts (cached) ----------
+# ---------- Load artifacts ----------
 @st.cache_resource
 def load_artifacts():
     with open("calibrated_model2.pkl", "rb") as f:
@@ -37,16 +37,12 @@ model, scaler = load_artifacts()
 st.title("RT-MLISS Score")
 st.markdown("""
 <h4 style='margin-top:-8px;color:gray;'>A real-time mortality prediction tool for trauma patients</h4>
-<p style='font-size:16px;color:#555;'>
-<!-- Developed by <b>MD Cobler-Lichter MD MSDS</b>, JM Delamater MD MPH, AM Reyes MD MPH, TR Arcieri MD,
-JP Meizoso MD MSPH, CI Schulman MD PhD MSPH, BM Parker DO, KG Proctor PhD, T Loftus MD PHD, N Namias MD MBA -->
-</p>
 <p style='font-size:14px;color:#555;'>
 Models are calibrated so the output reflects the predicted probability of in-hospital mortality based on the training data.
 </p>
 """, unsafe_allow_html=True)
 
-# ---------- Helpers (live inputs; namespaced keys; no reset on rerun) ----------
+# ---------- Helpers ----------
 def int_input_live(label, key, min_val=None, max_val=None, placeholder=""):
     raw_key = f"numraw_{key}"
     if raw_key not in st.session_state:
@@ -75,26 +71,6 @@ def float_input_live(label, key, min_val=None, max_val=None, placeholder=""):
         return v
     return np.nan
 
-
-# ---------- Reset helper ----------
-def reset_form():
-    keys_to_delete = []
-
-    for k in st.session_state.keys():
-        if (
-            k.startswith("numraw_")
-            or k.startswith("region_")
-            or k.startswith("inj_")
-            or k == "TRAUMATYPE"
-            or k == "last_pred"
-        ):
-            keys_to_delete.append(k)
-
-    for k in keys_to_delete:
-        del st.session_state[k]
-
-
-
 # ---------- Labels / bounds ----------
 label_map = {
     'TRAUMATYPE': "Trauma Type",
@@ -110,7 +86,7 @@ bounds = {
     'AGEYEARS': (0, 150),
     'TOTALGCS': (3, 15),
     'SBP': (0, 360),
-    'TEMPERATURE': (0, 93),     # °C
+    'TEMPERATURE': (0, 93),
     'PULSERATE': (0, 320),
     'WEIGHT': (2, 500),
 }
@@ -213,7 +189,6 @@ with left_col:
                 backend_var = frontend_labels[disp]
                 injury_inputs[backend_var] = 0
 
-
 # ---------- Patient Info & Vitals ----------
 with right_col:
     st.subheader("Patient Info & Vitals")
@@ -246,7 +221,6 @@ with right_col:
         if var == 'PULSERATE':
             pulse_val = val
 
-
 # ---------- Derived variables ----------
 if (
     isinstance(sbp_val, (int, float))
@@ -270,40 +244,46 @@ except Exception as e:
     X = None
     st.error(f"Column alignment error: {e}")
 
+# ---------- Prediction callback ----------
+def run_prediction():
+    if X is None:
+        st.session_state["last_pred"] = None
+        st.session_state["prediction_error"] = "Input data could not be aligned with model columns."
+        return
 
-# ---------- Predict button ----------
-st.markdown("---")
-submitted = st.button("Predict Mortality", use_container_width=True)
-
-# ---------- Output (persist last prediction) ----------
-st.markdown("### RT-MLISS Score (Predicted Mortality):")
-mortality_output = st.empty()
-
-if 'last_pred' not in st.session_state:
-    st.session_state['last_pred'] = None
-
-if submitted and X is not None:
     try:
         X_scaled = scaler.transform(X)
         pred = float(model.predict_proba(X_scaled)[:, 1][0])
-        st.session_state['last_pred'] = pred
+        st.session_state["last_pred"] = pred
+        st.session_state["prediction_error"] = None
     except Exception as e:
-        st.session_state['last_pred'] = None
-        mortality_output.error(f"Error during prediction: {e}")
+        st.session_state["last_pred"] = None
+        st.session_state["prediction_error"] = str(e)
 
-if st.session_state['last_pred'] is not None:
+# ---------- Predict button ----------
+st.markdown("---")
+
+st.button(
+    "Predict Mortality",
+    on_click=run_prediction,
+    use_container_width=True
+)
+
+# ---------- Output ----------
+st.markdown("### RT-MLISS Score (Predicted Mortality):")
+mortality_output = st.empty()
+
+if "last_pred" not in st.session_state:
+    st.session_state["last_pred"] = None
+
+if "prediction_error" not in st.session_state:
+    st.session_state["prediction_error"] = None
+
+if st.session_state["prediction_error"]:
+    mortality_output.error(f"Error during prediction: {st.session_state['prediction_error']}")
+
+elif st.session_state["last_pred"] is not None:
     mortality_output.markdown(
         f"<p style='font-size:36px;font-weight:bold;color:#d62728;'>{st.session_state['last_pred']:.1%}</p>",
         unsafe_allow_html=True
     )
-
-st.markdown("---")
-
-
-if False:
-    st.button(
-        "Reset Form",
-        on_click=reset_form,
-        use_container_width=True
-    )
-
